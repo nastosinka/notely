@@ -24,6 +24,10 @@ import com.notely.service.ScoreService
 import com.notely.ui.component.ScoreCard
 import com.notely.ui.dialog.ScoreFilePicker
 import com.notely.service.ThumbnailService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 @Composable
 fun FolderScreen(
@@ -34,14 +38,25 @@ fun FolderScreen(
     onOpenScore: (Score) -> Unit,
     thumbnailService: ThumbnailService,
 ) {
-    val scores = remember(folder.id) {
-        mutableStateListOf<Score>().apply {
-            addAll(scoreService.getScores(folder))
-        }
-    }
+    val scores = remember(folder.id) { mutableStateListOf<Score>() }
+    val scope = rememberCoroutineScope()
+    var isImporting by remember(folder.id) { mutableStateOf(false) }
+    var isLoading by remember(folder.id) { mutableStateOf(true) }
+    var errorMessage by remember(folder.id) { mutableStateOf<String?>(null) }
 
-    var errorMessage by remember(folder.id) {
-        mutableStateOf<String?>(null)
+    LaunchedEffect(folder.id) {
+        isLoading = true
+        try {
+            val loaded = withContext(Dispatchers.IO) { scoreService.getScores(folder) }
+            scores.clear()
+            scores.addAll(loaded)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            errorMessage = "Не удалось загрузить ноты"
+        } finally {
+            isLoading = false
+        }
     }
 
     Row(
@@ -71,20 +86,29 @@ fun FolderScreen(
 
             Button(
                 onClick = {
-                    runCatching {
-                        filePicker.chooseFile()?.let { path ->
-                            scoreService.importScore(folder, path)
+                    if (!isImporting) {
+                        scope.launch {
+                            isImporting = true
+                            errorMessage = null
+                            try {
+                                val selected = withContext(Dispatchers.IO) { filePicker.chooseFile() }
+                                if (selected != null) {
+                                    val imported = withContext(Dispatchers.IO) {
+                                        scoreService.importScore(folder, selected)
+                                    }
+                                    scores.add(imported)
+                                }
+                            } catch (exception: CancellationException) {
+                                throw exception
+                            } catch (exception: Exception) {
+                                errorMessage = "Не удалось импортировать ноты"
+                            } finally {
+                                isImporting = false
+                            }
                         }
-                    }.onSuccess { score ->
-                        if (score != null) {
-                            scores.add(score)
-                        }
-                        errorMessage = null
-                    }.onFailure { exception ->
-                        errorMessage = exception.message
-                            ?: "Не удалось импортировать ноты"
                     }
                 },
+                enabled = !isImporting,
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -128,7 +152,14 @@ fun FolderScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            if (scores.isEmpty()) {
+            if (isImporting) {
+                Text("Импортируем ноты...", color = Color(0xFF6583A4))
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (isLoading) {
+                CircularProgressIndicator(color = Color(0xFF719FCF))
+            } else if (scores.isEmpty()) {
                 Text(
                     text = "Здесь пока нет нот. Нажмите +, чтобы импортировать файл.",
                     color = Color(0xFF6583A4),

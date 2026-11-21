@@ -20,15 +20,34 @@ import com.notely.domain.Folder
 import com.notely.service.FolderService
 import com.notely.ui.component.CreateFolderDialog
 import com.notely.ui.component.FolderCard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LibraryScreen(
     folderService: FolderService,
     onOpenFolder: (Folder) -> Unit
 ) {
-    val folders = remember {
-        mutableStateListOf<Folder>().apply {
-            addAll(folderService.getFolders())
+    val folders = remember { mutableStateListOf<Folder>() }
+    val scope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
+    var isSaving by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(folderService) {
+        isLoading = true
+        try {
+            val loaded = withContext(Dispatchers.IO) { folderService.getFolders() }
+            folders.clear()
+            folders.addAll(loaded)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            loadError = "Не удалось загрузить библиотеку"
+        } finally {
+            isLoading = false
         }
     }
 
@@ -98,7 +117,9 @@ fun LibraryScreen(
 
             Spacer(Modifier.height(28.dp))
 
-            if (folders.isEmpty()) {
+            if (isLoading) {
+                CircularProgressIndicator(color = Color(0xFF719FCF))
+            } else if (folders.isEmpty()) {
                 Text(
                     text = "Пока нет папок. Нажмите +, чтобы создать первую.",
                     color = Color(0xFF6583A4),
@@ -135,18 +156,24 @@ fun LibraryScreen(
             },
             errorMessage = errorMessage,
             onCreate = { name, emoji ->
-                runCatching {
-                    folderService.createFolder(
-                        name = name,
-                        emoji = emoji
-                    )
-                }.onSuccess { folder ->
-                    folders.add(folder)
-                    showCreateDialog = false
-                    errorMessage = null
-                }.onFailure { exception ->
-                    errorMessage = exception.message
-                        ?: "Не удалось создать папку"
+                if (!isSaving) {
+                    scope.launch {
+                        isSaving = true
+                        try {
+                            val folder = withContext(Dispatchers.IO) {
+                                folderService.createFolder(name, emoji)
+                            }
+                            folders.add(folder)
+                            showCreateDialog = false
+                            errorMessage = null
+                        } catch (exception: CancellationException) {
+                            throw exception
+                        } catch (exception: Exception) {
+                            errorMessage = exception.message ?: "Не удалось создать папку"
+                        } finally {
+                            isSaving = false
+                        }
+                    }
                 }
             }
         )

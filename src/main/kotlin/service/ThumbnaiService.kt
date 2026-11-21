@@ -9,17 +9,20 @@ import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 
 class ThumbnailService {
 
     fun getThumbnail(filePath: Path): ImageBitmap {
+        require(Files.isRegularFile(filePath, NOFOLLOW_LINKS)) { "Файл нот недоступен" }
         val thumbnailPath = filePath.parent.resolve(
             ".notely-preview.png"
         )
 
         val originalModified = Files.getLastModifiedTime(filePath)
 
-        val shouldGenerate = !Files.isRegularFile(thumbnailPath) ||
+        require(!Files.isSymbolicLink(thumbnailPath)) { "Ссылка вместо превью запрещена" }
+        val shouldGenerate = !Files.isRegularFile(thumbnailPath, NOFOLLOW_LINKS) ||
                 Files.getLastModifiedTime(thumbnailPath) < originalModified
 
         if (shouldGenerate) {
@@ -71,12 +74,18 @@ class ThumbnailService {
                     "PDF не содержит страниц"
                 }
 
-                PDFRenderer(document).renderImageWithDPI(0, 72f)
+                PDFRenderer(document).renderImageWithDPI(
+                    0,
+                    PdfService.safeDpi(
+                        document.getPage(0).cropBox.width.toDouble(),
+                        document.getPage(0).cropBox.height.toDouble(),
+                        72.0
+                    )
+                )
             }
 
             "jpg", "jpeg", "png" -> {
-                ImageIO.read(filePath.toFile())
-                    ?: error("Не удалось прочитать изображение")
+                SafeImageReader.read(filePath, 1024)
             }
 
             else -> error("Неподдерживаемый формат")

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.notely.domain.Score
 import com.notely.service.ThumbnailService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 
@@ -34,8 +35,12 @@ fun ScoreCard(
         filePath
     ) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                thumbnailService.getThumbnail(filePath)
+            try {
+                Result.success(thumbnailService.getThumbnail(filePath))
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                Result.failure(exception)
             }
         }
     }

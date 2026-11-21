@@ -16,25 +16,28 @@ repositories {
     mavenCentral()
 }
 
+
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material)
     implementation(compose.materialIconsExtended)
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.yaml:snakeyaml:2.3")
     implementation("org.apache.pdfbox:pdfbox:3.0.8")
 
-    implementation("org.yaml:snakeyaml:2.3")
-
-    testImplementation(kotlin("test"))
-}
-
-kotlin {
-    jvmToolchain(21)
+    testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+
+kotlin {
+    jvmToolchain(21)
 }
 
 compose.desktop {

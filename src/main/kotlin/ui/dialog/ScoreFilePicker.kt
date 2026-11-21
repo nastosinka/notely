@@ -5,6 +5,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.prefs.Preferences
 import javax.swing.JFileChooser
+import javax.swing.SwingUtilities
+import java.util.concurrent.atomic.AtomicReference
 import javax.swing.filechooser.FileNameExtensionFilter
 
 class ScoreFilePicker {
@@ -13,6 +15,23 @@ class ScoreFilePicker {
         .node("com/notely")
 
     fun chooseFile(): Path? {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return showChooser()
+        }
+        val selection = AtomicReference<Path?>()
+        val failure = AtomicReference<Throwable?>()
+        SwingUtilities.invokeAndWait {
+            try {
+                selection.set(showChooser())
+            } catch (exception: Throwable) {
+                failure.set(exception)
+            }
+        }
+        failure.get()?.let { throw IllegalStateException("Не удалось открыть выбор файла", it) }
+        return selection.get()
+    }
+
+    private fun showChooser(): Path? {
         val defaultDirectory = Paths.get(
             System.getProperty("user.home"),
             "Documents"
@@ -20,7 +39,7 @@ class ScoreFilePicker {
 
         val savedDirectory = preferences
             .get(LAST_DIRECTORY_KEY, null)
-            ?.let(Paths::get)
+            ?.let { runCatching { Paths.get(it) }.getOrNull() }
             ?.takeIf(Files::isDirectory)
 
         val initialDirectory = savedDirectory

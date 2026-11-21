@@ -12,9 +12,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.FormatAlignCenter
-import androidx.compose.material.icons.filled.FormatAlignRight
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +27,7 @@ import com.notely.domain.Score
 import com.notely.service.PdfService
 import com.notely.service.RenderedPages
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 
@@ -70,12 +71,12 @@ fun ScoreViewerScreen(
         value = null
 
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                pdfService.renderPages(
-                    filePath = filePath,
-                    startIndex = pageIndex,
-                    count = pagesPerRow
-                )
+            try {
+                Result.success(pdfService.renderPages(filePath, pageIndex, pagesPerRow))
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                Result.failure(exception)
             }
         }
     }
@@ -196,9 +197,9 @@ fun ScoreViewerScreen(
                 modifier = Modifier.size(40.dp)
             ) {
                 val alignmentIcon = when (pageAlignment) {
-                    Alignment.Start -> Icons.Default.FormatAlignLeft
+                    Alignment.Start -> Icons.AutoMirrored.Default.FormatAlignLeft
                     Alignment.CenterHorizontally -> Icons.Default.FormatAlignCenter
-                    else -> Icons.Default.FormatAlignRight
+                    else -> Icons.AutoMirrored.Default.FormatAlignRight
                 }
 
                 val alignmentDescription = when (pageAlignment) {
