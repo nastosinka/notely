@@ -83,20 +83,26 @@ class ThumbnailService {
         }
     }
 
+
     private fun resize(
         image: BufferedImage,
         targetWidth: Int
     ): BufferedImage {
-        val width = minOf(image.width, targetWidth)
-        val height = maxOf(
-            1,
-            (image.height.toDouble() * width / image.width)
-                .toInt()
+        val cropSize = minOf(image.width, image.height)
+
+        val cropX = (image.width - cropSize) / 2
+        val cropY = 0
+
+        val cropped = image.getSubimage(
+            cropX,
+            cropY,
+            cropSize,
+            cropSize
         )
 
         val result = BufferedImage(
-            width,
-            height,
+            targetWidth,
+            targetWidth,
             BufferedImage.TYPE_INT_RGB
         )
 
@@ -109,11 +115,11 @@ class ThumbnailService {
             )
 
             graphics.drawImage(
-                image,
+                cropped,
                 0,
                 0,
-                width,
-                height,
+                targetWidth,
+                targetWidth,
                 null
             )
         } finally {

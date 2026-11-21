@@ -7,65 +7,80 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import java.nio.file.Path
 import javax.imageio.ImageIO
 
-data class RenderedScore(
-    val image: ImageBitmap,
+data class RenderedPages(
+    val images: List<ImageBitmap>,
     val pageCount: Int
 )
 
 class PdfService {
 
-    fun renderPage(
+    fun renderPages(
         filePath: Path,
-        pageIndex: Int
-    ): RenderedScore {
+        startIndex: Int,
+        count: Int
+    ): RenderedPages {
+        require(startIndex >= 0)
+        require(count in 1..3)
+
         return when (
             filePath.fileName.toString()
                 .substringAfterLast('.')
                 .lowercase()
         ) {
-            "pdf" -> renderPdf(filePath, pageIndex)
-            "jpg", "jpeg", "png" -> renderImage(filePath, pageIndex)
+            "pdf" -> renderPdfPages(
+                filePath,
+                startIndex,
+                count
+            )
+
+            "jpg", "jpeg", "png" -> renderImage(filePath, startIndex)
+
             else -> error("Неподдерживаемый формат файла")
         }
     }
 
-    private fun renderPdf(
+    private fun renderPdfPages(
         filePath: Path,
-        pageIndex: Int
-    ): RenderedScore {
+        startIndex: Int,
+        count: Int
+    ): RenderedPages {
         Loader.loadPDF(filePath.toFile()).use { document ->
-            val pageCount = document.numberOfPages
+            val totalPages = document.numberOfPages
 
-            require(pageIndex in 0 until pageCount) {
+            require(startIndex < totalPages) {
                 "Страница не найдена"
             }
 
             val renderer = PDFRenderer(document)
-            val image = renderer.renderImageWithDPI(
-                pageIndex,
-                150f
-            )
+            val endIndex = minOf(startIndex + count, totalPages)
 
-            return RenderedScore(
-                image = image.toComposeImageBitmap(),
-                pageCount = pageCount
+            val images = (startIndex until endIndex).map { index ->
+                renderer.renderImageWithDPI(
+                    index,
+                    150f
+                ).toComposeImageBitmap()
+            }
+
+            return RenderedPages(
+                images = images,
+                pageCount = totalPages
             )
         }
     }
 
     private fun renderImage(
         filePath: Path,
-        pageIndex: Int
-    ): RenderedScore {
-        require(pageIndex == 0) {
+        startIndex: Int
+    ): RenderedPages {
+        require(startIndex == 0) {
             "Страница не найдена"
         }
 
         val image = ImageIO.read(filePath.toFile())
             ?: error("Не удалось прочитать изображение")
 
-        return RenderedScore(
-            image = image.toComposeImageBitmap(),
+        return RenderedPages(
+            images = listOf(image.toComposeImageBitmap()),
             pageCount = 1
         )
     }
