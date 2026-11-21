@@ -1,0 +1,21 @@
+app:
+  name: Notely
+  version: 0.1.0
+
+library:
+  directory: "Notely Library"
+  default-location: "Documents"
+
+ui:
+  theme: BLUE
+  window:
+    width: 1100
+    height: 750
+
+viewer:
+  default-zoom: 1.0
+  default-pages-per-row: 1
+
+storage:
+  generate-thumbnails: true
+  thumbnail-width: 300
